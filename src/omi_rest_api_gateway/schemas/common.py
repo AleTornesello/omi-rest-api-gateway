@@ -1,0 +1,21 @@
+from pydantic import BaseModel, ConfigDict
+
+
+def to_camel(value: str) -> str:
+    first, *rest = value.split("_")
+    return first + "".join(word.capitalize() for word in rest)
+
+
+class ApiModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        str_strip_whitespace=True,
+    )
+
+
+class HealthResponse(ApiModel):
+    status: str
+    service: str
+    version: str
+    environment: str

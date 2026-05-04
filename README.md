@@ -1,40 +1,52 @@
 # OMI REST API Gateway
 
-REST API service for querying the Italian OMI portal through a simple HTTP interface.
+Enterprise Python REST API scaffold for querying the Italian **Osservatorio del Mercato Immobiliare (OMI)** portal through a clean FastAPI interface.
 
-The project exposes data from the **Osservatorio del Mercato Immobiliare (OMI)**, managed by the Italian Agenzia delle Entrate, so client applications can retrieve real-estate quotation data without integrating directly with the public OMI web portal.
+The service is built with:
+
+- Python 3.13
+- FastAPI
+- uv for dependency management, locking, scripts, and local execution
+- Pydantic Settings for typed configuration
+- HTTPX for upstream OMI portal calls
+- Ruff, mypy, pytest, and coverage for quality gates
 
 > Data source attribution: `Agenzia Entrate - OMI`.
 
-## What It Does
+## Project Status
 
-OMI REST API Gateway is designed to act as a small backend gateway between applications and the Italian OMI services.
+This repository contains the production-ready API scaffold and the boundaries needed to implement the OMI portal integration. The upstream client currently returns an empty result set until the real OMI portal search flow is mapped in `src/omi_rest_api_gateway/clients/omi.py`.
 
-Typical use cases include:
+## Architecture
 
-- searching OMI quotation data by location;
-- retrieving real-estate market value ranges for a municipality or OMI zone;
-- exposing OMI data to web apps, internal tools, dashboards, or automation scripts;
-- normalizing OMI portal responses into predictable JSON payloads.
+```text
+src/omi_rest_api_gateway
+├── api/                 # FastAPI routers and versioned endpoints
+├── clients/             # Upstream HTTP clients
+├── core/                # Settings, logging, exception handlers
+├── schemas/             # API request/response models
+├── services/            # Business orchestration
+├── dependencies.py      # FastAPI dependency providers
+└── main.py              # App factory, middleware, lifespan, CLI entry
+```
 
-## Background
-
-OMI quotations provide minimum and maximum real-estate market and rental values by territorial zone, property type, and reference semester.
-
-These quotations are useful as a broad market reference, but they are not a replacement for a detailed property appraisal. A professional valuation is still required when a precise estimate is needed.
+The application uses an app factory (`create_app`) and FastAPI lifespan startup to create shared infrastructure such as the upstream HTTP client.
 
 ## API
 
-The exact endpoints may evolve with the implementation. A typical API shape is expected to look like this:
-
 ```http
-GET /api/omi/quotations
+GET /
+GET /api/v1/health/live
+GET /api/v1/health/ready
+GET /api/v1/omi/quotations
+GET /api/v1/openapi.json
+GET /docs
 ```
 
-Example query:
+Example request:
 
 ```http
-GET /api/omi/quotations?province=MI&municipality=Milano&semester=2025-2&propertyType=abitazioni
+GET /api/v1/omi/quotations?province=MI&municipality=Milano&semester=2025-2&propertyType=abitazioni&contractType=sale
 ```
 
 Example response:
@@ -42,143 +54,137 @@ Example response:
 ```json
 {
   "source": "Agenzia Entrate - OMI",
-  "province": "MI",
-  "municipality": "Milano",
-  "semester": "2025-2",
-  "results": [
-    {
-      "zone": "B1",
-      "description": "Central area",
-      "propertyType": "abitazioni",
-      "marketValue": {
-        "min": 3500,
-        "max": 5200,
-        "unit": "EUR/m2"
-      },
-      "rentalValue": {
-        "min": 12,
-        "max": 20,
-        "unit": "EUR/m2/month"
-      }
-    }
-  ]
+  "query": {
+    "province": "MI",
+    "municipality": "Milano",
+    "zone": null,
+    "semester": "2025-2",
+    "propertyType": "abitazioni",
+    "contractType": "sale"
+  },
+  "results": []
 }
 ```
 
-## Suggested Endpoints
-
-```http
-GET /health
-GET /api/omi/regions
-GET /api/omi/provinces
-GET /api/omi/municipalities
-GET /api/omi/zones
-GET /api/omi/quotations
-```
-
-## Query Parameters
-
-Common filters:
-
-- `region`: Italian region name or code;
-- `province`: province code, for example `MI`, `RM`, `NA`;
-- `municipality`: municipality name;
-- `zone`: OMI zone code;
-- `semester`: reference semester, for example `2025-2`;
-- `propertyType`: property category, for example `abitazioni`, `uffici`, `negozi`, `box`;
-- `contractType`: `sale` or `rent`.
-
 ## Getting Started
 
-Clone the repository:
+Install dependencies:
 
 ```bash
-git clone <repository-url>
-cd omi-rest-api-gateway
+uv sync
 ```
 
-Install dependencies and start the service using the commands provided by the implementation stack.
-
-For example:
+Run the API locally:
 
 ```bash
-# install dependencies
-<package-manager> install
-
-# run locally
-<package-manager> run dev
+uv run uvicorn omi_rest_api_gateway.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
-The service should expose the API on a local HTTP port, for example:
+Open:
 
 ```text
-http://localhost:8080
+http://localhost:8080/docs
+```
+
+You can also run the packaged entry point:
+
+```bash
+uv run omi-rest-api-gateway
 ```
 
 ## Configuration
 
-Recommended environment variables:
+Copy the example environment file and adjust it for your environment:
+
+```bash
+cp .env.example .env
+```
+
+Main variables:
 
 ```env
-PORT=8080
-OMI_BASE_URL=<omi-portal-base-url>
-REQUEST_TIMEOUT_MS=30000
-CACHE_TTL_SECONDS=86400
+OMI_API_ENVIRONMENT=local
+OMI_API_HOST=0.0.0.0
+OMI_API_PORT=8080
+OMI_API_LOG_LEVEL=INFO
+OMI_API_API__PREFIX=/api/v1
+OMI_API_OMI__BASE_URL=https://www.agenziaentrate.gov.it
+OMI_API_OMI__TIMEOUT_SECONDS=30
+OMI_API_OMI__CACHE_TTL_SECONDS=86400
 ```
 
-## Caching
-
-OMI quotation data is published by semester and does not usually change frequently after publication. A cache layer is recommended to:
-
-- reduce calls to the source portal;
-- improve response time;
-- protect the service from temporary upstream failures.
-
-## Error Handling
-
-The API should return predictable HTTP status codes:
-
-- `200 OK`: request completed successfully;
-- `400 Bad Request`: invalid or missing query parameters;
-- `404 Not Found`: no matching OMI data found;
-- `502 Bad Gateway`: upstream OMI portal error;
-- `504 Gateway Timeout`: upstream request timed out.
-
-Example error:
-
-```json
-{
-  "error": "OMI_UPSTREAM_TIMEOUT",
-  "message": "The OMI portal did not respond before the configured timeout."
-}
-```
+Nested settings use `__`, for example `OMI_API_API__PREFIX`.
 
 ## Development
 
-Recommended project tasks:
+Run tests:
 
 ```bash
-# run tests
-<package-manager> test
-
-# run linting
-<package-manager> run lint
-
-# build
-<package-manager> run build
+uv run pytest
 ```
 
-## Legal And Data Notice
+Run linting:
+
+```bash
+uv run ruff check .
+```
+
+Run formatting:
+
+```bash
+uv run ruff format .
+```
+
+Run type checks:
+
+```bash
+uv run mypy src tests
+```
+
+Run all local quality gates:
+
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src tests
+uv run pytest
+```
+
+## Docker
+
+Build:
+
+```bash
+docker build -t omi-rest-api-gateway .
+```
+
+Run:
+
+```bash
+docker run --rm -p 8080:8080 --env-file .env omi-rest-api-gateway
+```
+
+## CI
+
+GitHub Actions is configured in `.github/workflows/ci.yml` to run:
+
+- dependency sync with uv
+- Ruff linting
+- Ruff format check
+- mypy
+- pytest with coverage
+
+## OMI Data Notice
 
 This project is not affiliated with Agenzia delle Entrate.
+
+OMI quotations provide broad market ranges by area, period, and property category. They are useful as a reference, but they are not a formal appraisal and should not replace professional real-estate valuation.
 
 When using OMI data, cite the source as:
 
 ```text
 Agenzia Entrate - OMI
 ```
-
-OMI quotations represent broad market ranges and should not be treated as a formal appraisal or as a substitute for professional real-estate valuation.
 
 ## License
 

@@ -32,6 +32,9 @@ htmlcov/
 # Type checkers
 .mypy_cache/
 
+# Linters and formatters
+.ruff_cache/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

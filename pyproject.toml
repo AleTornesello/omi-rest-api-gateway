@@ -1,0 +1,84 @@
+[project]
+name = "omi-rest-api-gateway"
+version = "0.1.0"
+description = "Enterprise FastAPI REST gateway for querying Italian OMI portal data."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "OMI REST API Gateway maintainers" }]
+dependencies = [
+  "fastapi[standard]>=0.115.0",
+  "httpx>=0.28.0",
+  "pydantic-settings>=2.8.0",
+  "structlog>=25.1.0",
+]
+
+[project.scripts]
+omi-rest-api-gateway = "omi_rest_api_gateway.main:run"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.14.0",
+  "pytest>=8.3.0",
+  "pytest-cov>=6.0.0",
+  "ruff>=0.9.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv]
+required-version = ">=0.8.3"
+
+[tool.pytest.ini_options]
+addopts = "-q --cov=omi_rest_api_gateway --cov-report=term-missing"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["omi_rest_api_gateway"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+  "B",
+  "C4",
+  "E",
+  "F",
+  "FA",
+  "I",
+  "PTH",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+]
+ignore = [
+  "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+plugins = []
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["uvicorn.*"]
+ignore_missing_imports = true
